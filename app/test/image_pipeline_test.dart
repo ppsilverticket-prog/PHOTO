@@ -7,6 +7,7 @@ import 'package:photo_app/core/edit_ops.dart';
 import 'package:photo_app/core/face/retouch_settings.dart';
 import 'package:photo_app/core/filter_presets.dart';
 import 'package:photo_app/core/image_pipeline.dart';
+import 'package:photo_app/core/upscale/upscaler.dart';
 
 /// 4x2 테스트 이미지. 왼쪽 절반은 빨강, 오른쪽 절반은 파랑.
 Uint8List makeTestImage() {
@@ -173,6 +174,32 @@ void main() {
       ));
       expect(withNeutral.getPixel(0, 0).r, plain.getPixel(0, 0).r);
       expect(withNeutral.getPixel(3, 1).b, plain.getPixel(3, 1).b);
+    });
+
+    test('upscale runs last and doubles the output dimensions', () {
+      final out = decode(runPipeline(
+        PipelineRequest(
+          sourceBytes: makeTestImage(),
+          ops: const [RotateOp(1)],
+          upscale: const UpscaleSettings(factor: 2),
+          jpegQuality: 100,
+        ),
+      ));
+      // 4x2 → 회전(2x4) → 2배(4x8)
+      expect(out.width, 4);
+      expect(out.height, 8);
+    });
+
+    test('upscale off keeps dimensions unchanged', () {
+      final out = decode(runPipeline(
+        PipelineRequest(
+          sourceBytes: makeTestImage(),
+          ops: const [],
+          upscale: UpscaleSettings.off,
+        ),
+      ));
+      expect(out.width, 4);
+      expect(out.height, 2);
     });
 
     test('generateFilterThumbnails returns original + all presets', () {

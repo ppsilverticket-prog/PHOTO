@@ -4,6 +4,7 @@ import 'color_adjustments.dart';
 import 'edit_ops.dart';
 import 'erase/erase_stroke.dart';
 import 'face/retouch_settings.dart';
+import 'upscale/upscaler.dart';
 
 /// 특정 시점의 전체 편집 상태.
 ///
@@ -18,6 +19,7 @@ class EditSnapshot {
     this.adjustments = ColorAdjustments.neutral,
     this.filterId,
     this.filterStrength = 1.0,
+    this.upscale = UpscaleSettings.off,
   });
 
   static const EditSnapshot initial = EditSnapshot();
@@ -28,13 +30,15 @@ class EditSnapshot {
   final ColorAdjustments adjustments;
   final String? filterId;
   final double filterStrength;
+  final UpscaleSettings upscale;
 
   bool get isPristine =>
       geometry.isEmpty &&
       erasures.isEmpty &&
       retouch.isNeutral &&
       adjustments.isNeutral &&
-      filterId == null;
+      filterId == null &&
+      upscale.isNoop;
 
   EditSnapshot copyWith({
     List<EditOp>? geometry,
@@ -44,6 +48,7 @@ class EditSnapshot {
     String? filterId,
     bool clearFilter = false,
     double? filterStrength,
+    UpscaleSettings? upscale,
   }) {
     return EditSnapshot(
       geometry: geometry ?? this.geometry,
@@ -52,6 +57,7 @@ class EditSnapshot {
       adjustments: adjustments ?? this.adjustments,
       filterId: clearFilter ? null : (filterId ?? this.filterId),
       filterStrength: filterStrength ?? this.filterStrength,
+      upscale: upscale ?? this.upscale,
     );
   }
 

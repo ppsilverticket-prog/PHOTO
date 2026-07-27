@@ -14,12 +14,14 @@ import '../../core/face/retouch_settings.dart';
 import '../../core/filter_presets.dart';
 import '../../core/image_pipeline.dart';
 import '../../core/platform/image_export.dart';
+import '../../core/upscale/upscaler.dart';
 import 'adjust_panel.dart';
 import 'crop_screen.dart';
 import 'erase_screen.dart';
 import 'filter_panel.dart';
 import 'retouch_panel.dart';
 import 'shader_preview.dart';
+import 'upscale_screen.dart';
 
 enum _EditorMode { tools, retouch, filter, adjust }
 
@@ -335,6 +337,32 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
+  Future<void> _openUpscale() async {
+    final geom = _geomBytes;
+    if (geom == null || _busy) return;
+    final snapshot = _history.current;
+
+    final settings = await Navigator.of(context).push<UpscaleSettings>(
+      MaterialPageRoute<UpscaleSettings>(
+        builder: (_) => UpscaleScreen(
+          imageBytes: geom,
+          initialSettings: snapshot.upscale,
+        ),
+      ),
+    );
+    if (settings != null && settings != snapshot.upscale) {
+      _commit(snapshot.copyWith(upscale: settings));
+      if (mounted && !settings.isNoop) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('화질 개선 ${settings.factor}배 — 저장할 때 적용됩니다.'),
+          ),
+        );
+      }
+    }
+  }
+
   Future<Uint8List> _renderFullResolution() {
     final snapshot = _history.current;
     return compute(
@@ -348,6 +376,7 @@ class _EditorScreenState extends State<EditorScreen> {
         adjustments: snapshot.adjustments,
         filterId: snapshot.filterId,
         filterStrength: snapshot.filterStrength,
+        upscale: snapshot.upscale,
         jpegQuality: 95,
       ),
     );
@@ -447,8 +476,10 @@ class _EditorScreenState extends State<EditorScreen> {
       case _EditorMode.tools:
         return _GeometryToolbar(
           enabled: _geomBytes != null && !_busy,
+          upscaleOn: !_history.current.upscale.isNoop,
           onCrop: _openCrop,
           onErase: _openErase,
+          onUpscale: _openUpscale,
           onRotateLeft: () =>
               _commit(_history.current.addGeometry(const RotateOp(3))),
           onRotateRight: () =>
@@ -643,8 +674,10 @@ class _EditorScreenState extends State<EditorScreen> {
 class _GeometryToolbar extends StatelessWidget {
   const _GeometryToolbar({
     required this.enabled,
+    required this.upscaleOn,
     required this.onCrop,
     required this.onErase,
+    required this.onUpscale,
     required this.onRotateLeft,
     required this.onRotateRight,
     required this.onFlipHorizontal,
@@ -652,8 +685,12 @@ class _GeometryToolbar extends StatelessWidget {
   });
 
   final bool enabled;
+
+  /// 화질 개선이 켜져 있으면 도구 버튼에 표시해 저장 시 적용됨을 알린다.
+  final bool upscaleOn;
   final VoidCallback onCrop;
   final VoidCallback onErase;
+  final VoidCallback onUpscale;
   final VoidCallback onRotateLeft;
   final VoidCallback onRotateRight;
   final VoidCallback onFlipHorizontal;
@@ -672,6 +709,11 @@ class _GeometryToolbar extends StatelessWidget {
             icon: Icons.auto_fix_high,
             label: '지우개',
             onPressed: enabled ? onErase : null,
+          ),
+          _ToolButton(
+            icon: upscaleOn ? Icons.high_quality : Icons.high_quality_outlined,
+            label: upscaleOn ? '화질 개선 ✓' : '화질 개선',
+            onPressed: enabled ? onUpscale : null,
           ),
           _ToolButton(
             icon: Icons.crop,

@@ -3,6 +3,7 @@ import 'package:photo_app/core/color_adjustments.dart';
 import 'package:photo_app/core/edit_ops.dart';
 import 'package:photo_app/core/edit_state.dart';
 import 'package:photo_app/core/erase/erase_stroke.dart';
+import 'package:photo_app/core/upscale/upscaler.dart';
 
 void main() {
   group('HistoryStack', () {
@@ -74,6 +75,17 @@ void main() {
       );
       expect(erased.isPristine, isFalse);
       expect(snapshot.erasures, isEmpty, reason: '원본은 그대로여야 한다');
+    });
+
+    test('upscale counts toward the pristine check', () {
+      const snapshot = EditSnapshot();
+      expect(snapshot.isPristine, isTrue);
+      final upscaled = snapshot.copyWith(
+        upscale: const UpscaleSettings(factor: 2),
+      );
+      expect(upscaled.isPristine, isFalse);
+      expect(upscaled.copyWith(upscale: UpscaleSettings.off).isPristine,
+          isTrue);
     });
 
     test('EraseStroke equality compares points and radius', () {
