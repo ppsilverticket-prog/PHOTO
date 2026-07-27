@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -10,22 +11,28 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/color_adjustments.dart';
 import '../../core/edit_ops.dart';
 import '../../core/edit_state.dart';
+import '../../core/face/face_detection_service.dart';
+import '../../core/face/face_landmarks.dart';
+import '../../core/face/retouch_settings.dart';
 import '../../core/filter_presets.dart';
 import '../../core/image_pipeline.dart';
 import 'adjust_panel.dart';
 import 'crop_screen.dart';
 import 'filter_panel.dart';
+import 'retouch_panel.dart';
 import 'shader_preview.dart';
 
-enum _EditorMode { tools, filter, adjust }
+enum _EditorMode { tools, retouch, filter, adjust }
 
 /// 사진 편집 화면.
 ///
-/// - 기하 연산(자르기/회전/반전)은 CPU isolate에서 프리뷰 바이트로 굽는다.
-/// - 색보정/필터는 GPU 셰이더로 실시간 렌더링한다 (셰이더 로드 실패 시
-///   CPU 폴백).
-/// - 모든 변경은 [EditSnapshot]으로 undo/redo 된다.
-/// - 저장/공유 시에만 원본 해상도로 전체 파이프라인을 실행한다.
+/// 프리뷰 파이프라인은 세 단계로 나뉜다:
+/// 1. 기하 연산(자르기/회전/반전) — isolate에서 굽고 얼굴 검출과 필터
+///    썸네일의 기준이 된다.
+/// 2. 얼굴 보정(워핑 + 피부) — isolate. 슬라이더를 놓았을 때만 재계산한다.
+/// 3. 색보정/필터 — GPU 셰이더로 실시간 (실패 시 CPU 폴백).
+///
+/// 저장/공유 시에만 원본 해상도로 전체 파이프라인을 한 번에 실행한다.
 class EditorScreen extends StatefulWidget {
   const EditorScreen({super.key, required this.originalBytes});
 
@@ -47,25 +54,33 @@ class _EditorScreenState extends State<EditorScreen> {
   /// 방향 보정 + 다운스케일만 적용된 프리뷰 원본 (비교 보기에도 사용).
   Uint8List? _basePreviewBytes;
 
-  /// 기하 연산까지 적용된 프리뷰.
+  /// 기하 연산까지 적용된 프리뷰. 자르기 화면·썸네일·얼굴 검출의 입력.
   Uint8List? _geomBytes;
-  ui.Image? _geomImage;
   List<EditOp> _renderedGeometry = const [];
+
+  /// 기하 + 얼굴 보정까지 적용된 프리뷰 (셰이더 입력).
+  ui.Image? _previewImage;
+  FaceRetouchSettings _renderedRetouch = FaceRetouchSettings.neutral;
 
   ui.FragmentProgram? _program;
   bool _programResolved = false;
 
-  /// 셰이더 폴백용: 기하 + 색보정까지 CPU로 적용된 프리뷰.
+  /// 셰이더 폴백용: 색보정까지 CPU로 적용된 프리뷰.
   Uint8List? _fallbackBytes;
 
   List<Uint8List>? _thumbnails;
+  List<FaceLandmarks> _faces = const [];
+  bool _detecting = false;
 
   _EditorMode _mode = _EditorMode.tools;
   bool _busy = false;
   bool _saving = false;
   bool _comparing = false;
-  int _generation = 0;
+
+  int _geomGeneration = 0;
+  int _retouchGeneration = 0;
   int _thumbGeneration = 0;
+  int _detectGeneration = 0;
 
   @override
   void initState() {
@@ -83,7 +98,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
   @override
   void dispose() {
-    _geomImage?.dispose();
+    _previewImage?.dispose();
+    unawaited(FaceDetectionService.instance.dispose());
     super.dispose();
   }
 
@@ -99,7 +115,7 @@ class _EditorScreenState extends State<EditorScreen> {
       );
       if (!mounted) return;
       setState(() => _basePreviewBytes = base);
-      await _setGeometryPreview(base, const []);
+      await _rebuildGeometry(EditSnapshot.initial);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -109,20 +125,103 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
-  Future<void> _setGeometryPreview(
-      Uint8List bytes, List<EditOp> geometry) async {
+  /// 기하 연산 재적용 → 얼굴 재검출 → 썸네일 재생성 → 얼굴 보정 재적용.
+  Future<void> _rebuildGeometry(EditSnapshot snapshot) async {
+    final base = _basePreviewBytes;
+    if (base == null) return;
+    final generation = ++_geomGeneration;
+    setState(() => _busy = true);
+    try {
+      final bytes = await compute(
+        runPipeline,
+        PipelineRequest(sourceBytes: base, ops: snapshot.geometry),
+      );
+      if (!mounted || generation != _geomGeneration) return;
+      setState(() {
+        _geomBytes = bytes;
+        _renderedGeometry = snapshot.geometry;
+      });
+
+      final probe = await decodeImageFromList(bytes);
+      final width = probe.width;
+      final height = probe.height;
+      probe.dispose();
+      if (!mounted || generation != _geomGeneration) return;
+
+      unawaited(_regenerateThumbnails(bytes));
+      await _detectFaces(bytes, width, height);
+      if (!mounted || generation != _geomGeneration) return;
+
+      await _rebuildRetouch(snapshot);
+    } finally {
+      if (mounted && generation == _geomGeneration) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  /// 얼굴 보정만 다시 적용한다 (기하 결과는 그대로 재사용).
+  Future<void> _rebuildRetouch(EditSnapshot snapshot) async {
+    final geom = _geomBytes;
+    if (geom == null) return;
+    final generation = ++_retouchGeneration;
+
+    if (snapshot.retouch.isNeutral) {
+      await _setPreviewImage(geom, generation);
+      if (mounted && generation == _retouchGeneration) {
+        _renderedRetouch = snapshot.retouch;
+      }
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final bytes = await compute(
+        runPipeline,
+        PipelineRequest(
+          sourceBytes: geom,
+          ops: const [],
+          retouch: snapshot.retouch,
+          faces: _faces,
+        ),
+      );
+      if (!mounted || generation != _retouchGeneration) return;
+      await _setPreviewImage(bytes, generation);
+      if (mounted && generation == _retouchGeneration) {
+        _renderedRetouch = snapshot.retouch;
+      }
+    } finally {
+      if (mounted && generation == _retouchGeneration) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _setPreviewImage(Uint8List bytes, int generation) async {
     final image = await decodeImageFromList(bytes);
-    if (!mounted) {
+    if (!mounted || generation != _retouchGeneration) {
       image.dispose();
       return;
     }
     setState(() {
-      _geomImage?.dispose();
-      _geomBytes = bytes;
-      _geomImage = image;
-      _renderedGeometry = geometry;
+      _previewImage?.dispose();
+      _previewImage = image;
     });
-    _regenerateThumbnails(bytes);
+  }
+
+  Future<void> _detectFaces(Uint8List bytes, int width, int height) async {
+    final generation = ++_detectGeneration;
+    setState(() => _detecting = true);
+    try {
+      final faces =
+          await FaceDetectionService.instance.detect(bytes, width, height);
+      if (!mounted || generation != _detectGeneration) return;
+      setState(() => _faces = faces);
+    } finally {
+      if (mounted && generation == _detectGeneration) {
+        setState(() => _detecting = false);
+      }
+    }
   }
 
   Future<void> _regenerateThumbnails(Uint8List geomBytes) async {
@@ -135,27 +234,13 @@ class _EditorScreenState extends State<EditorScreen> {
     setState(() => _thumbnails = thumbs);
   }
 
-  /// 스냅샷과 화면 상태를 동기화한다 (기하 프리뷰 / CPU 폴백 재계산).
   Future<void> _syncFromSnapshot(EditSnapshot snapshot) async {
     setState(() => _live = snapshot);
 
     if (!listEquals(snapshot.geometry, _renderedGeometry)) {
-      final base = _basePreviewBytes;
-      if (base == null) return;
-      final generation = ++_generation;
-      setState(() => _busy = true);
-      try {
-        final bytes = await compute(
-          runPipeline,
-          PipelineRequest(sourceBytes: base, ops: snapshot.geometry),
-        );
-        if (!mounted || generation != _generation) return;
-        await _setGeometryPreview(bytes, snapshot.geometry);
-      } finally {
-        if (mounted && generation == _generation) {
-          setState(() => _busy = false);
-        }
-      }
+      await _rebuildGeometry(snapshot);
+    } else if (snapshot.retouch != _renderedRetouch) {
+      await _rebuildRetouch(snapshot);
     }
     if (_programResolved && _program == null) _recomputeFallback();
   }
@@ -170,6 +255,8 @@ class _EditorScreenState extends State<EditorScreen> {
       PipelineRequest(
         sourceBytes: base,
         ops: snapshot.geometry,
+        retouch: snapshot.retouch,
+        faces: _faces,
         adjustments: snapshot.adjustments,
         filterId: snapshot.filterId,
         filterStrength: snapshot.filterStrength,
@@ -212,6 +299,8 @@ class _EditorScreenState extends State<EditorScreen> {
       PipelineRequest(
         sourceBytes: widget.originalBytes,
         ops: snapshot.geometry,
+        retouch: snapshot.retouch,
+        faces: _faces,
         adjustments: snapshot.adjustments,
         filterId: snapshot.filterId,
         filterStrength: snapshot.filterStrength,
@@ -304,7 +393,7 @@ class _EditorScreenState extends State<EditorScreen> {
       return Image.memory(base, gaplessPlayback: true);
     }
     final program = _program;
-    final image = _geomImage;
+    final image = _previewImage;
     if (program != null && image != null) {
       return ShaderPreview(
         program: program,
@@ -335,6 +424,14 @@ class _EditorScreenState extends State<EditorScreen> {
           onFlipVertical: () => _commit(
               _history.current.addGeometry(const FlipOp(horizontal: false))),
         );
+      case _EditorMode.retouch:
+        return RetouchPanel(
+          settings: _live.retouch,
+          faceCount: _faces.length,
+          detecting: _detecting,
+          onChanged: (r) => setState(() => _live = _live.copyWith(retouch: r)),
+          onCommitted: (r) => _commit(_history.current.copyWith(retouch: r)),
+        );
       case _EditorMode.filter:
         return FilterPanel(
           thumbnails: _thumbnails,
@@ -345,8 +442,8 @@ class _EditorScreenState extends State<EditorScreen> {
             clearFilter: id == null,
             filterStrength: 1.0,
           )),
-          onStrengthChanged: (v) => setState(
-              () => _live = _live.copyWith(filterStrength: v)),
+          onStrengthChanged: (v) =>
+              setState(() => _live = _live.copyWith(filterStrength: v)),
           onStrengthCommitted: (v) =>
               _commit(_history.current.copyWith(filterStrength: v)),
         );
@@ -458,6 +555,11 @@ class _EditorScreenState extends State<EditorScreen> {
                       children: [
                         for (final (mode, icon, label) in const [
                           (_EditorMode.tools, Icons.crop_rotate, '도구'),
+                          (
+                            _EditorMode.retouch,
+                            Icons.face_retouching_natural,
+                            '얼굴'
+                          ),
                           (_EditorMode.filter, Icons.auto_awesome, '필터'),
                           (_EditorMode.adjust, Icons.tune, '보정'),
                         ])

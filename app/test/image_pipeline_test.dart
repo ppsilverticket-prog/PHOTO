@@ -4,6 +4,7 @@ import 'dart:ui' show Rect;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:photo_app/core/edit_ops.dart';
+import 'package:photo_app/core/face/retouch_settings.dart';
 import 'package:photo_app/core/filter_presets.dart';
 import 'package:photo_app/core/image_pipeline.dart';
 
@@ -115,6 +116,63 @@ void main() {
       final pixel = out.getPixel(0, 0);
       expect((pixel.r - pixel.g).abs(), lessThan(8));
       expect((pixel.g - pixel.b).abs(), lessThan(8));
+    });
+
+    test('retouch runs on the geometry result and keeps its size', () {
+      // 피부색 잡음 패치를 회전 + 스무딩한다.
+      final source = img.Image(width: 80, height: 40);
+      for (var y = 0; y < 40; y++) {
+        for (var x = 0; x < 80; x++) {
+          final d = (x + y).isEven ? 18 : -18;
+          source.setPixelRgb(x, y, 230 + d, 180 + d, 150 + d);
+        }
+      }
+      final bytes = Uint8List.fromList(img.encodePng(source));
+
+      img.Image run(FaceRetouchSettings retouch) => decode(runPipeline(
+            PipelineRequest(
+              sourceBytes: bytes,
+              ops: const [RotateOp(1)],
+              retouch: retouch,
+              jpegQuality: 100,
+            ),
+          ));
+
+      double energy(img.Image image) {
+        var total = 0.0;
+        for (var y = 0; y < image.height; y++) {
+          for (var x = 1; x < image.width; x++) {
+            total +=
+                (image.getPixel(x, y).r - image.getPixel(x - 1, y).r).abs();
+          }
+        }
+        return total / (image.height * (image.width - 1));
+      }
+
+      final plain = run(FaceRetouchSettings.neutral);
+      final smoothed = run(const FaceRetouchSettings(skinSmooth: 1));
+
+      // 회전은 그대로 반영되고,
+      expect(smoothed.width, 40);
+      expect(smoothed.height, 80);
+      // 피부결은 눈에 띄게 줄되 완전히 뭉개지지는 않아야 한다.
+      expect(energy(smoothed), lessThan(energy(plain) * 0.8));
+      expect(energy(smoothed), greaterThan(0.5));
+    });
+
+    test('neutral retouch leaves the pipeline output untouched', () {
+      final plain = decode(runPipeline(
+        PipelineRequest(sourceBytes: makeTestImage(), ops: const []),
+      ));
+      final withNeutral = decode(runPipeline(
+        PipelineRequest(
+          sourceBytes: makeTestImage(),
+          ops: const [],
+          retouch: FaceRetouchSettings.neutral,
+        ),
+      ));
+      expect(withNeutral.getPixel(0, 0).r, plain.getPixel(0, 0).r);
+      expect(withNeutral.getPixel(3, 1).b, plain.getPixel(3, 1).b);
     });
 
     test('generateFilterThumbnails returns original + all presets', () {

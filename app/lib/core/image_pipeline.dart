@@ -5,6 +5,11 @@ import 'package:image/image.dart' as img;
 
 import 'color_adjustments.dart';
 import 'edit_ops.dart';
+import 'face/face_landmarks.dart';
+import 'face/face_warp.dart';
+import 'face/local_warp.dart';
+import 'face/retouch_settings.dart';
+import 'face/skin_smooth.dart';
 import 'filter_presets.dart';
 
 /// [runPipeline]에 넘기는 요청. compute() 격리(isolate)로 전달되므로
@@ -13,6 +18,8 @@ class PipelineRequest {
   const PipelineRequest({
     required this.sourceBytes,
     required this.ops,
+    this.retouch = FaceRetouchSettings.neutral,
+    this.faces = const [],
     this.adjustments = ColorAdjustments.neutral,
     this.filterId,
     this.filterStrength = 1.0,
@@ -26,7 +33,13 @@ class PipelineRequest {
   /// 순서대로 적용할 기하 연산 (자르기/회전/반전).
   final List<EditOp> ops;
 
-  /// 기하 연산 이후 적용할 색보정.
+  /// 얼굴 보정 설정 (기하 연산 이후, 색보정 이전에 적용).
+  final FaceRetouchSettings retouch;
+
+  /// 기하 연산이 적용된 이미지 기준으로 정규화된 얼굴 랜드마크.
+  final List<FaceLandmarks> faces;
+
+  /// 얼굴 보정 이후 적용할 색보정.
   final ColorAdjustments adjustments;
 
   /// 적용할 필터 프리셋 id (null이면 필터 없음).
@@ -41,11 +54,13 @@ class PipelineRequest {
   final int jpegQuality;
 }
 
-/// 디코딩 → EXIF 방향 보정 → (선택) 다운스케일 → 기하 연산 → 색보정/필터
-/// → JPEG 인코딩. compute()로 백그라운드 isolate에서 실행하는 최상위 함수.
+/// 디코딩 → EXIF 방향 보정 → (선택) 다운스케일 → 기하 연산 → 얼굴 보정
+/// → 색보정/필터 → JPEG 인코딩.
+/// compute()로 백그라운드 isolate에서 실행하는 최상위 함수.
 Uint8List runPipeline(PipelineRequest request) {
   var image = _decodeBase(request.sourceBytes, request.maxDimension);
   image = applyOps(image, request.ops);
+  image = applyRetouch(image, request.retouch, request.faces);
   image = applyAdjustmentsCpu(
     image,
     adjustments: request.adjustments,
@@ -84,6 +99,37 @@ img.Image applyOps(img.Image image, List<EditOp> ops) {
       CropOp(:final rect) => _crop(image, rect),
     };
   }
+  return image;
+}
+
+/// 얼굴 워핑 → 피부 보정 순으로 적용한다.
+///
+/// [faces]는 [image] 기준 정규화 좌표여야 한다. 워핑은 랜드마크가 있어야
+/// 동작하지만, 피부 보정은 얼굴이 검출되지 않아도 색상 마스크만으로
+/// 동작한다.
+img.Image applyRetouch(
+  img.Image image,
+  FaceRetouchSettings retouch,
+  List<FaceLandmarks> faces,
+) {
+  if (retouch.isNeutral) return image;
+
+  if (retouch.hasWarp && faces.isNotEmpty) {
+    final pixelFaces = [
+      for (final face in faces) face.toPixels(image.width, image.height),
+    ];
+    image = applyWarps(image, buildAllFaceWarps(pixelFaces, retouch));
+  }
+
+  if (retouch.hasSkinWork) {
+    image = applySkinRetouch(
+      image,
+      faces: faces,
+      smooth: retouch.skinSmooth,
+      tone: retouch.skinTone,
+    );
+  }
+
   return image;
 }
 
