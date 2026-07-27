@@ -14,12 +14,21 @@
 수동으로 돌리려면 저장소 → **Actions** → **웹 미리보기 배포** →
 **Run workflow**.
 
+> Pages를 켜기 전에 돌린 실행은 `deploy` 단계에서
+> `Failed to create deployment (status: 404)`로 실패한다. 정상이다.
+> 1번을 먼저 하고 **Re-run jobs**로 다시 돌리면 된다.
+
 빌드는 3~5분쯤 걸린다. 완료되면 Actions 실행 화면의 `deploy` 작업에
 접속 주소가 표시된다. 기본 주소는 다음과 같다.
 
 ```
-https://ppsilverticket-prog.github.io/photo/
+https://ppsilverticket-prog.github.io/PHOTO/
 ```
+
+> 주소의 `PHOTO`는 **대문자**다. GitHub Pages는 저장소 이름을 그대로
+> 경로로 쓰기 때문에 대소문자가 다르면 자산을 못 찾아 빈 화면이 된다.
+> 워크플로는 저장소 이름을 실행 컨텍스트에서 읽어 쓰므로 이름이 바뀌어도
+> 따라간다.
 
 ## 3. 아이폰에서 열기
 

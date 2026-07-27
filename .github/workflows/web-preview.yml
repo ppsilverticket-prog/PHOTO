@@ -43,11 +43,16 @@ jobs:
         run: flutter test
 
       # --base-href: 프로젝트 페이지는 /<저장소 이름>/ 아래에 서빙된다.
+      #   저장소 이름을 직접 적으면 대소문자가 어긋났을 때 자산 경로가 전부
+      #   404가 나므로(빈 화면), 실행 컨텍스트에서 그대로 가져온다.
       # --no-web-resources-cdn: CanvasKit을 번들에 포함해 외부 CDN에
       #   의존하지 않게 한다 (CDN이 막힌 망에서 빈 화면이 뜨는 것 방지).
       - name: 웹 빌드
         working-directory: app
-        run: flutter build web --release --base-href /photo/ --no-web-resources-cdn
+        run: |
+          flutter build web --release \
+            --base-href "/${{ github.event.repository.name }}/" \
+            --no-web-resources-cdn
 
       - uses: actions/upload-pages-artifact@v3
         with:
