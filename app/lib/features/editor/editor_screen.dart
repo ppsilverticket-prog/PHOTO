@@ -1,12 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:gal/gal.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../core/color_adjustments.dart';
 import '../../core/edit_ops.dart';
@@ -16,6 +12,7 @@ import '../../core/face/face_landmarks.dart';
 import '../../core/face/retouch_settings.dart';
 import '../../core/filter_presets.dart';
 import '../../core/image_pipeline.dart';
+import '../../core/platform/image_export.dart';
 import 'adjust_panel.dart';
 import 'crop_screen.dart';
 import 'filter_panel.dart';
@@ -309,26 +306,22 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
+  String get _exportName => 'PHOTO_${DateTime.now().millisecondsSinceEpoch}';
+
   Future<void> _save() async {
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      final bytes = await _renderFullResolution();
-      await Gal.putImageBytes(
-        bytes,
-        name: 'PHOTO_${DateTime.now().millisecondsSinceEpoch}',
-      );
+      final message = await saveImage(await _renderFullResolution(),
+          _exportName);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('갤러리에 저장했습니다.')),
-      );
-    } on GalException catch (e) {
-      if (!mounted) return;
-      final message = e.type == GalExceptionType.accessDenied
-          ? '사진 접근 권한을 허용해 주세요.'
-          : '저장에 실패했습니다: ${e.type.message}';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
+      );
+    } on ImageExportException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
       );
     } catch (e) {
       if (!mounted) return;
@@ -344,14 +337,7 @@ class _EditorScreenState extends State<EditorScreen> {
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      final bytes = await _renderFullResolution();
-      final dir = await getTemporaryDirectory();
-      final path =
-          '${dir.path}/PHOTO_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await File(path).writeAsBytes(bytes, flush: true);
-      await SharePlus.instance.share(
-        ShareParams(files: [XFile(path, mimeType: 'image/jpeg')]),
-      );
+      await shareImage(await _renderFullResolution(), _exportName);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

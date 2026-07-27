@@ -1,0 +1,64 @@
+name: 웹 미리보기 배포
+
+# 실기기(iOS) 빌드는 맥이 필요하지만, 웹 빌드는 리눅스 러너에서 되므로
+# 아이폰 사파리로 바로 열어볼 수 있는 미리보기를 GitHub Pages에 올린다.
+
+on:
+  push:
+    branches: [claude/ai-photo-editing-app-v94b4f]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 배포는 한 번에 하나만. 새 푸시가 오면 진행 중인 배포는 취소한다.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+          cache: true
+
+      - name: 의존성 설치
+        working-directory: app
+        run: flutter pub get
+
+      - name: 정적 분석
+        working-directory: app
+        run: flutter analyze
+
+      - name: 테스트
+        working-directory: app
+        run: flutter test
+
+      # --base-href: 프로젝트 페이지는 /<저장소 이름>/ 아래에 서빙된다.
+      # --no-web-resources-cdn: CanvasKit을 번들에 포함해 외부 CDN에
+      #   의존하지 않게 한다 (CDN이 막힌 망에서 빈 화면이 뜨는 것 방지).
+      - name: 웹 빌드
+        working-directory: app
+        run: flutter build web --release --base-href /photo/ --no-web-resources-cdn
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

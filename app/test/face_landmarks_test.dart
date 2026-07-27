@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart'
     as mlkit;
-import 'package:photo_app/core/face/face_detection_service.dart';
+import 'package:photo_app/core/face/face_detection_native.dart';
 import 'package:photo_app/core/face/face_landmarks.dart';
 
 void main() {

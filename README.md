@@ -3,7 +3,8 @@
 EPIK · SNOW · SODA · Lightroom을 벤치마크한 Android/iOS AI 사진 보정 앱.
 
 - 📋 **기획서**: [docs/PLANNING.md](docs/PLANNING.md)
-- 📱 **아이폰에서 실행하기**: [docs/IOS_SETUP.md](docs/IOS_SETUP.md)
+- 📱 **아이폰에서 웹으로 바로 테스트** (맥 불필요): [docs/WEB_PREVIEW.md](docs/WEB_PREVIEW.md)
+- 🍎 **실기기 iOS 빌드** (맥 필요): [docs/IOS_SETUP.md](docs/IOS_SETUP.md)
 - 핵심 기능: AI 지우개, 화질 개선(업스케일링), 얼굴/피부/체형 보정, 감성 필터, 생성형 개체 제거, AI 프로필
 - 스택(예정): Flutter + 온디바이스 AI(TFLite/ONNX) + FastAPI 서버(생성형 기능)
 - 수익화(예정): 구독 + 크레딧 하이브리드 (RevenueCat)
@@ -59,6 +60,10 @@ flutter analyze      # 정적 분석
 - 필터는 LUT 텍스처 대신 파라메트릭(기본 보정값 + 채널별 lift/gamma/gain)으로
   정의 — 에셋 없이 GPU/CPU 경로가 같은 파라미터를 공유한다.
 - `lib/features/` — 화면 단위 (home, editor).
+- `lib/core/platform/`, `lib/core/face/face_detection_service.dart` — 조건부
+  import으로 플랫폼별 구현을 고른다. 웹에는 갤러리 저장 API가 없고 ML Kit
+  얼굴 검출도 없으므로 각각 브라우저 다운로드와 빈 결과 스텁으로 대체된다.
+  덕분에 맥 없이도 웹 미리보기로 앱 대부분을 테스트할 수 있다.
 
 ### 알려진 한계
 
