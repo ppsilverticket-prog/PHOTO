@@ -20,7 +20,11 @@ class AdjustmentShaderProgram {
 }
 
 /// 기하 연산이 적용된 [image] 위에 색보정/필터를 GPU 셰이더로 실시간 렌더링.
-class ShaderPreview extends StatelessWidget {
+///
+/// [ui.FragmentShader]는 네이티브 자원을 쥐고 있으므로 위젯 수명 동안 하나만
+/// 만들어 재사용한다. 빌드마다 새로 만들면 슬라이더를 드래그하는 내내
+/// 초당 수십 개가 쌓인다.
+class ShaderPreview extends StatefulWidget {
   const ShaderPreview({
     super.key,
     required this.program,
@@ -37,17 +41,39 @@ class ShaderPreview extends StatelessWidget {
   final double strength;
 
   @override
+  State<ShaderPreview> createState() => _ShaderPreviewState();
+}
+
+class _ShaderPreviewState extends State<ShaderPreview> {
+  late ui.FragmentShader _shader = widget.program.fragmentShader();
+
+  @override
+  void didUpdateWidget(ShaderPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.program != widget.program) {
+      _shader.dispose();
+      _shader = widget.program.fragmentShader();
+    }
+  }
+
+  @override
+  void dispose() {
+    _shader.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Center(
       child: AspectRatio(
-        aspectRatio: image.width / image.height,
+        aspectRatio: widget.image.width / widget.image.height,
         child: CustomPaint(
           painter: _ShaderPainter(
-            shader: program.fragmentShader(),
-            image: image,
-            adjustments: adjustments,
-            preset: preset,
-            strength: preset == null ? 0.0 : strength,
+            shader: _shader,
+            image: widget.image,
+            adjustments: widget.adjustments,
+            preset: widget.preset,
+            strength: widget.preset == null ? 0.0 : widget.strength,
           ),
         ),
       ),
