@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'color_adjustments.dart';
 import 'edit_ops.dart';
+import 'erase/erase_stroke.dart';
 import 'face/retouch_settings.dart';
 
 /// 특정 시점의 전체 편집 상태.
@@ -12,6 +13,7 @@ import 'face/retouch_settings.dart';
 class EditSnapshot {
   const EditSnapshot({
     this.geometry = const [],
+    this.erasures = const [],
     this.retouch = FaceRetouchSettings.neutral,
     this.adjustments = ColorAdjustments.neutral,
     this.filterId,
@@ -21,6 +23,7 @@ class EditSnapshot {
   static const EditSnapshot initial = EditSnapshot();
 
   final List<EditOp> geometry;
+  final List<EraseStroke> erasures;
   final FaceRetouchSettings retouch;
   final ColorAdjustments adjustments;
   final String? filterId;
@@ -28,12 +31,14 @@ class EditSnapshot {
 
   bool get isPristine =>
       geometry.isEmpty &&
+      erasures.isEmpty &&
       retouch.isNeutral &&
       adjustments.isNeutral &&
       filterId == null;
 
   EditSnapshot copyWith({
     List<EditOp>? geometry,
+    List<EraseStroke>? erasures,
     FaceRetouchSettings? retouch,
     ColorAdjustments? adjustments,
     String? filterId,
@@ -42,6 +47,7 @@ class EditSnapshot {
   }) {
     return EditSnapshot(
       geometry: geometry ?? this.geometry,
+      erasures: erasures ?? this.erasures,
       retouch: retouch ?? this.retouch,
       adjustments: adjustments ?? this.adjustments,
       filterId: clearFilter ? null : (filterId ?? this.filterId),

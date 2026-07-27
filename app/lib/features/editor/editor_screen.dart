@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/color_adjustments.dart';
 import '../../core/edit_ops.dart';
 import '../../core/edit_state.dart';
+import '../../core/erase/erase_stroke.dart';
 import '../../core/face/face_detection_service.dart';
 import '../../core/face/face_landmarks.dart';
 import '../../core/face/retouch_settings.dart';
@@ -15,6 +16,7 @@ import '../../core/image_pipeline.dart';
 import '../../core/platform/image_export.dart';
 import 'adjust_panel.dart';
 import 'crop_screen.dart';
+import 'erase_screen.dart';
 import 'filter_panel.dart';
 import 'retouch_panel.dart';
 import 'shader_preview.dart';
@@ -51,9 +53,11 @@ class _EditorScreenState extends State<EditorScreen> {
   /// 방향 보정 + 다운스케일만 적용된 프리뷰 원본 (비교 보기에도 사용).
   Uint8List? _basePreviewBytes;
 
-  /// 기하 연산까지 적용된 프리뷰. 자르기 화면·썸네일·얼굴 검출의 입력.
+  /// 기하 연산 + 지우개까지 적용된 프리뷰.
+  /// 자르기 화면·썸네일·얼굴 검출·얼굴 보정의 입력이 된다.
   Uint8List? _geomBytes;
   List<EditOp> _renderedGeometry = const [];
+  List<EraseStroke> _renderedErasures = const [];
 
   /// 기하 + 얼굴 보정까지 적용된 프리뷰 (셰이더 입력).
   ui.Image? _previewImage;
@@ -122,7 +126,10 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
-  /// 기하 연산 재적용 → 얼굴 재검출 → 썸네일 재생성 → 얼굴 보정 재적용.
+  /// 기하 연산 + 지우개 재적용 → 얼굴 재검출 → 썸네일 재생성 → 얼굴 보정.
+  ///
+  /// 지우개는 인페인팅이라 비용이 크므로 이 단계에 묶어 둔다. 덕분에
+  /// 색보정·필터를 만질 때는 다시 계산되지 않는다.
   Future<void> _rebuildGeometry(EditSnapshot snapshot) async {
     final base = _basePreviewBytes;
     if (base == null) return;
@@ -131,12 +138,17 @@ class _EditorScreenState extends State<EditorScreen> {
     try {
       final bytes = await compute(
         runPipeline,
-        PipelineRequest(sourceBytes: base, ops: snapshot.geometry),
+        PipelineRequest(
+          sourceBytes: base,
+          ops: snapshot.geometry,
+          erasures: snapshot.erasures,
+        ),
       );
       if (!mounted || generation != _geomGeneration) return;
       setState(() {
         _geomBytes = bytes;
         _renderedGeometry = snapshot.geometry;
+        _renderedErasures = snapshot.erasures;
       });
 
       final probe = await decodeImageFromList(bytes);
@@ -234,7 +246,8 @@ class _EditorScreenState extends State<EditorScreen> {
   Future<void> _syncFromSnapshot(EditSnapshot snapshot) async {
     setState(() => _live = snapshot);
 
-    if (!listEquals(snapshot.geometry, _renderedGeometry)) {
+    if (!listEquals(snapshot.geometry, _renderedGeometry) ||
+        !listEquals(snapshot.erasures, _renderedErasures)) {
       await _rebuildGeometry(snapshot);
     } else if (snapshot.retouch != _renderedRetouch) {
       await _rebuildRetouch(snapshot);
@@ -252,6 +265,7 @@ class _EditorScreenState extends State<EditorScreen> {
       PipelineRequest(
         sourceBytes: base,
         ops: snapshot.geometry,
+        erasures: snapshot.erasures,
         retouch: snapshot.retouch,
         faces: _faces,
         adjustments: snapshot.adjustments,
@@ -289,6 +303,38 @@ class _EditorScreenState extends State<EditorScreen> {
     if (rect != null) _commit(_history.current.addGeometry(CropOp(rect)));
   }
 
+  /// 지우개 화면은 **지우개 적용 전** 이미지를 받아야 붓질을 되돌릴 수 있다.
+  /// 그래서 기하 연산만 적용한 판을 따로 만들어 넘긴다.
+  Future<void> _openErase() async {
+    final base = _basePreviewBytes;
+    if (base == null || _busy) return;
+    final snapshot = _history.current;
+
+    setState(() => _busy = true);
+    Uint8List clean;
+    try {
+      clean = await compute(
+        runPipeline,
+        PipelineRequest(sourceBytes: base, ops: snapshot.geometry),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (!mounted) return;
+
+    final strokes = await Navigator.of(context).push<List<EraseStroke>>(
+      MaterialPageRoute<List<EraseStroke>>(
+        builder: (_) => EraseScreen(
+          imageBytes: clean,
+          initialStrokes: snapshot.erasures,
+        ),
+      ),
+    );
+    if (strokes != null && !listEquals(strokes, snapshot.erasures)) {
+      _commit(snapshot.copyWith(erasures: strokes));
+    }
+  }
+
   Future<Uint8List> _renderFullResolution() {
     final snapshot = _history.current;
     return compute(
@@ -296,6 +342,7 @@ class _EditorScreenState extends State<EditorScreen> {
       PipelineRequest(
         sourceBytes: widget.originalBytes,
         ops: snapshot.geometry,
+        erasures: snapshot.erasures,
         retouch: snapshot.retouch,
         faces: _faces,
         adjustments: snapshot.adjustments,
@@ -401,6 +448,7 @@ class _EditorScreenState extends State<EditorScreen> {
         return _GeometryToolbar(
           enabled: _geomBytes != null && !_busy,
           onCrop: _openCrop,
+          onErase: _openErase,
           onRotateLeft: () =>
               _commit(_history.current.addGeometry(const RotateOp(3))),
           onRotateRight: () =>
@@ -596,6 +644,7 @@ class _GeometryToolbar extends StatelessWidget {
   const _GeometryToolbar({
     required this.enabled,
     required this.onCrop,
+    required this.onErase,
     required this.onRotateLeft,
     required this.onRotateRight,
     required this.onFlipHorizontal,
@@ -604,6 +653,7 @@ class _GeometryToolbar extends StatelessWidget {
 
   final bool enabled;
   final VoidCallback onCrop;
+  final VoidCallback onErase;
   final VoidCallback onRotateLeft;
   final VoidCallback onRotateRight;
   final VoidCallback onFlipHorizontal;
@@ -611,11 +661,18 @@ class _GeometryToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 도구가 화면 폭보다 많아질 수 있으므로 가로 스크롤로 둔다.
     return SizedBox(
       height: 84,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         children: [
+          _ToolButton(
+            icon: Icons.auto_fix_high,
+            label: '지우개',
+            onPressed: enabled ? onErase : null,
+          ),
           _ToolButton(
             icon: Icons.crop,
             label: '자르기',

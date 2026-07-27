@@ -5,6 +5,8 @@ import 'package:image/image.dart' as img;
 
 import 'color_adjustments.dart';
 import 'edit_ops.dart';
+import 'erase/erase_stroke.dart';
+import 'erase/inpaint.dart';
 import 'face/face_landmarks.dart';
 import 'face/face_warp.dart';
 import 'face/local_warp.dart';
@@ -18,6 +20,7 @@ class PipelineRequest {
   const PipelineRequest({
     required this.sourceBytes,
     required this.ops,
+    this.erasures = const [],
     this.retouch = FaceRetouchSettings.neutral,
     this.faces = const [],
     this.adjustments = ColorAdjustments.neutral,
@@ -32,6 +35,9 @@ class PipelineRequest {
 
   /// 순서대로 적용할 기하 연산 (자르기/회전/반전).
   final List<EditOp> ops;
+
+  /// 지우개 붓질. 기하 연산이 적용된 이미지 기준 정규화 좌표다.
+  final List<EraseStroke> erasures;
 
   /// 얼굴 보정 설정 (기하 연산 이후, 색보정 이전에 적용).
   final FaceRetouchSettings retouch;
@@ -54,12 +60,13 @@ class PipelineRequest {
   final int jpegQuality;
 }
 
-/// 디코딩 → EXIF 방향 보정 → (선택) 다운스케일 → 기하 연산 → 얼굴 보정
-/// → 색보정/필터 → JPEG 인코딩.
+/// 디코딩 → EXIF 방향 보정 → (선택) 다운스케일 → 기하 연산 → 지우개
+/// → 얼굴 보정 → 색보정/필터 → JPEG 인코딩.
 /// compute()로 백그라운드 isolate에서 실행하는 최상위 함수.
 Uint8List runPipeline(PipelineRequest request) {
   var image = _decodeBase(request.sourceBytes, request.maxDimension);
   image = applyOps(image, request.ops);
+  image = applyErasures(image, request.erasures);
   image = applyRetouch(image, request.retouch, request.faces);
   image = applyAdjustmentsCpu(
     image,
@@ -100,6 +107,13 @@ img.Image applyOps(img.Image image, List<EditOp> ops) {
     };
   }
   return image;
+}
+
+/// 붓질을 마스크로 그린 뒤 그 영역을 주변 텍스처로 메운다.
+img.Image applyErasures(img.Image image, List<EraseStroke> strokes) {
+  if (strokes.isEmpty) return image;
+  final mask = rasterizeStrokes(strokes, image.width, image.height);
+  return inpaintMasked(image, mask);
 }
 
 /// 얼굴 워핑 → 피부 보정 순으로 적용한다.

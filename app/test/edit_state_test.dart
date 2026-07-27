@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:photo_app/core/color_adjustments.dart';
 import 'package:photo_app/core/edit_ops.dart';
 import 'package:photo_app/core/edit_state.dart';
+import 'package:photo_app/core/erase/erase_stroke.dart';
 
 void main() {
   group('HistoryStack', () {
@@ -60,6 +61,31 @@ void main() {
       final next = snapshot.addGeometry(const RotateOp(1));
       expect(snapshot.geometry, isEmpty);
       expect(next.geometry.single, isA<RotateOp>());
+    });
+
+    test('erasures count toward the pristine check', () {
+      const snapshot = EditSnapshot();
+      expect(snapshot.isPristine, isTrue);
+
+      final erased = snapshot.copyWith(
+        erasures: const [
+          EraseStroke(points: [Offset(0.5, 0.5)], radius: 0.05),
+        ],
+      );
+      expect(erased.isPristine, isFalse);
+      expect(snapshot.erasures, isEmpty, reason: '원본은 그대로여야 한다');
+    });
+
+    test('EraseStroke equality compares points and radius', () {
+      const a = EraseStroke(points: [Offset(0.1, 0.2)], radius: 0.05);
+      const b = EraseStroke(points: [Offset(0.1, 0.2)], radius: 0.05);
+      const c = EraseStroke(points: [Offset(0.1, 0.3)], radius: 0.05);
+      const d = EraseStroke(points: [Offset(0.1, 0.2)], radius: 0.06);
+
+      expect(a, b);
+      expect(a.hashCode, b.hashCode);
+      expect(a, isNot(c));
+      expect(a, isNot(d));
     });
   });
 }
