@@ -4,6 +4,7 @@ import 'dart:ui' show Rect;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:photo_app/core/edit_ops.dart';
+import 'package:photo_app/core/filter_presets.dart';
 import 'package:photo_app/core/image_pipeline.dart';
 
 /// 4x2 테스트 이미지. 왼쪽 절반은 빨강, 오른쪽 절반은 파랑.
@@ -97,6 +98,33 @@ void main() {
       ));
       expect(out.width, 2);
       expect(out.height, 2);
+    });
+
+    test('adjustments and filter run after geometry ops', () {
+      // 모노 필터: 결과가 무채색이어야 한다.
+      final out = decode(runPipeline(
+        PipelineRequest(
+          sourceBytes: makeTestImage(),
+          ops: const [RotateOp(1)],
+          filterId: 'mono',
+          jpegQuality: 100,
+        ),
+      ));
+      expect(out.width, 2);
+      expect(out.height, 4);
+      final pixel = out.getPixel(0, 0);
+      expect((pixel.r - pixel.g).abs(), lessThan(8));
+      expect((pixel.g - pixel.b).abs(), lessThan(8));
+    });
+
+    test('generateFilterThumbnails returns original + all presets', () {
+      final thumbs = generateFilterThumbnails(
+        ThumbnailRequest(sourceBytes: makeTestImage(), size: 4),
+      );
+      expect(thumbs.length, kFilterPresets.length + 1);
+      for (final bytes in thumbs) {
+        expect(img.decodeImage(bytes), isNotNull);
+      }
     });
   });
 }

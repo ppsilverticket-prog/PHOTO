@@ -1,0 +1,68 @@
+import 'package:flutter/foundation.dart';
+
+import 'color_adjustments.dart';
+import 'edit_ops.dart';
+
+/// 특정 시점의 전체 편집 상태.
+///
+/// 기하 연산(자르기/회전/반전)과 색보정/필터를 함께 스냅샷으로 관리해
+/// 어떤 변경이든 undo/redo 한 번으로 되돌릴 수 있다.
+@immutable
+class EditSnapshot {
+  const EditSnapshot({
+    this.geometry = const [],
+    this.adjustments = ColorAdjustments.neutral,
+    this.filterId,
+    this.filterStrength = 1.0,
+  });
+
+  static const EditSnapshot initial = EditSnapshot();
+
+  final List<EditOp> geometry;
+  final ColorAdjustments adjustments;
+  final String? filterId;
+  final double filterStrength;
+
+  bool get isPristine =>
+      geometry.isEmpty && adjustments.isNeutral && filterId == null;
+
+  EditSnapshot copyWith({
+    List<EditOp>? geometry,
+    ColorAdjustments? adjustments,
+    String? filterId,
+    bool clearFilter = false,
+    double? filterStrength,
+  }) {
+    return EditSnapshot(
+      geometry: geometry ?? this.geometry,
+      adjustments: adjustments ?? this.adjustments,
+      filterId: clearFilter ? null : (filterId ?? this.filterId),
+      filterStrength: filterStrength ?? this.filterStrength,
+    );
+  }
+
+  EditSnapshot addGeometry(EditOp op) =>
+      copyWith(geometry: [...geometry, op]);
+}
+
+/// 스냅샷 기반 undo/redo 스택.
+class HistoryStack<T> {
+  HistoryStack(T initial) : _stack = [initial];
+
+  final List<T> _stack;
+  int _index = 0;
+
+  T get current => _stack[_index];
+  bool get canUndo => _index > 0;
+  bool get canRedo => _index < _stack.length - 1;
+
+  void push(T value) {
+    _stack.removeRange(_index + 1, _stack.length);
+    _stack.add(value);
+    _index++;
+  }
+
+  T? undo() => canUndo ? _stack[--_index] : null;
+
+  T? redo() => canRedo ? _stack[++_index] : null;
+}
