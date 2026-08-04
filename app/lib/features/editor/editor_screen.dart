@@ -14,6 +14,8 @@ import '../../core/face/retouch_settings.dart';
 import '../../core/filter_presets.dart';
 import '../../core/image_pipeline.dart';
 import '../../core/platform/image_export.dart';
+import '../../core/presets/preset_store.dart';
+import '../../core/presets/user_preset.dart';
 import '../../core/upscale/upscaler.dart';
 import 'adjust_panel.dart';
 import 'crop_screen.dart';
@@ -74,6 +76,7 @@ class _EditorScreenState extends State<EditorScreen> {
   List<Uint8List>? _thumbnails;
   List<FaceLandmarks> _faces = const [];
   bool _detecting = false;
+  List<UserPreset> _userPresets = const [];
 
   _EditorMode _mode = _EditorMode.tools;
   bool _busy = false;
@@ -97,6 +100,9 @@ class _EditorScreenState extends State<EditorScreen> {
       if (program == null) _recomputeFallback();
     });
     _prepareBase();
+    PresetStore.instance.load().then((presets) {
+      if (mounted) setState(() => _userPresets = presets);
+    });
   }
 
   @override
@@ -363,6 +369,82 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
+  Future<void> _savePreset() async {
+    final snapshot = _history.current;
+    final controller = TextEditingController(
+      text: '내 프리셋 ${_userPresets.length + 1}',
+    );
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('프리셋 저장'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 20,
+          decoration: const InputDecoration(labelText: '이름'),
+          onSubmitted: (value) => Navigator.of(context).pop(value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+
+    final presets = await PresetStore.instance.add(UserPreset(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      name: name,
+      adjustments: snapshot.adjustments,
+      filterId: snapshot.filterId,
+      filterStrength: snapshot.filterStrength,
+    ));
+    if (!mounted) return;
+    setState(() => _userPresets = presets);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('"$name" 프리셋을 저장했습니다.')),
+    );
+  }
+
+  void _applyPreset(UserPreset preset) {
+    _commit(_history.current.copyWith(
+      adjustments: preset.adjustments,
+      filterId: preset.filterId,
+      clearFilter: preset.filterId == null,
+      filterStrength: preset.filterStrength,
+    ));
+  }
+
+  Future<void> _deletePreset(UserPreset preset) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('"${preset.name}" 프리셋을 삭제할까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final presets = await PresetStore.instance.remove(preset.id);
+    if (mounted) setState(() => _userPresets = presets);
+  }
+
   Future<Uint8List> _renderFullResolution() {
     final snapshot = _history.current;
     return compute(
@@ -511,6 +593,12 @@ class _EditorScreenState extends State<EditorScreen> {
               setState(() => _live = _live.copyWith(filterStrength: v)),
           onStrengthCommitted: (v) =>
               _commit(_history.current.copyWith(filterStrength: v)),
+          userPresets: _userPresets,
+          canSavePreset: !_history.current.adjustments.isNeutral ||
+              _history.current.filterId != null,
+          onSavePreset: _savePreset,
+          onApplyPreset: _applyPreset,
+          onDeletePreset: _deletePreset,
         );
       case _EditorMode.adjust:
         return AdjustPanel(

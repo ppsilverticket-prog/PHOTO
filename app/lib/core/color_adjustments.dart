@@ -69,6 +69,29 @@ class ColorAdjustments {
   @override
   int get hashCode => Object.hash(brightness, contrast, saturation,
       temperature, tint, highlights, shadows);
+
+  Map<String, double> toJson() => {
+        if (brightness != 0) 'brightness': brightness,
+        if (contrast != 0) 'contrast': contrast,
+        if (saturation != 0) 'saturation': saturation,
+        if (temperature != 0) 'temperature': temperature,
+        if (tint != 0) 'tint': tint,
+        if (highlights != 0) 'highlights': highlights,
+        if (shadows != 0) 'shadows': shadows,
+      };
+
+  factory ColorAdjustments.fromJson(Map<String, dynamic> json) {
+    double f(String key) => (json[key] as num?)?.toDouble() ?? 0;
+    return ColorAdjustments(
+      brightness: f('brightness'),
+      contrast: f('contrast'),
+      saturation: f('saturation'),
+      temperature: f('temperature'),
+      tint: f('tint'),
+      highlights: f('highlights'),
+      shadows: f('shadows'),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,12 @@ EPIK · SNOW · SODA · Lightroom을 벤치마크한 Android/iOS AI 사진 보�
 
 ## 현재 상태
 
+**M5 진행 중** — 내 프리셋 (보정값 저장/재사용):
+
+- 필터 탭에서 현재 색보정+필터 조합을 이름 붙여 저장, 다른 사진에 원터치 적용
+- 탭 = 적용, 길게 누르기 = 삭제, 같은 이름은 덮어쓰기, 최대 30개
+- shared_preferences 저장 (모바일·웹 공통), 손상된 데이터는 무시하고 복구
+
 **M4 완료** — 지우개 + 화질 개선(업스케일링):
 
 - 지우개: exemplar-based inpainting (Criminisi). 모델 파일 없이 순수 Dart로
