@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/monetization/entitlement_service.dart';
 import '../../core/upscale/upscaler.dart';
+import '../paywall/paywall_screen.dart';
 
 /// 화질 개선 화면. 중앙 부분을 잘라 확대 전/후를 비교해 보여주고,
 /// 배율과 선명도를 고르면 설정을 돌려준다. 실제 적용은 저장할 때
@@ -167,19 +169,41 @@ class _UpscaleScreenState extends State<UpscaleScreen> {
                         ),
                       ),
                     ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      for (final factor in const [2, 4]) ...[
-                        ChoiceChip(
-                          label: Text('$factor배'),
-                          selected: _settings.factor == factor,
-                          onSelected: (_) =>
-                              _update(_settings.copyWith(factor: factor)),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                    ],
+                  // 4배는 프리미엄 전용. 구독하면 그 자리에서 바로 풀린다.
+                  ListenableBuilder(
+                    listenable: EntitlementService.instance,
+                    builder: (context, _) {
+                      final premium =
+                          EntitlementService.instance.isPremium;
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (final factor in const [2, 4]) ...[
+                            ChoiceChip(
+                              avatar: factor == 4 && !premium
+                                  ? const Icon(Icons.lock, size: 14)
+                                  : null,
+                              label: Text('$factor배'),
+                              selected: _settings.factor == factor,
+                              onSelected: (_) {
+                                if (factor == 4 && !premium) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const PaywallScreen(),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                _update(
+                                    _settings.copyWith(factor: factor));
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                   Row(
                     children: [

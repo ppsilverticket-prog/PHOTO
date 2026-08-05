@@ -20,6 +20,8 @@ class FilterPanel extends StatelessWidget {
     required this.onSavePreset,
     required this.onApplyPreset,
     required this.onDeletePreset,
+    this.lockedFilterIds = const {},
+    required this.onLockedSelect,
   });
 
   /// [0] = 원본, 이후는 [kFilterPresets] 순서. null이면 로딩 중.
@@ -38,6 +40,10 @@ class FilterPanel extends StatelessWidget {
   final VoidCallback onSavePreset;
   final ValueChanged<UserPreset> onApplyPreset;
   final ValueChanged<UserPreset> onDeletePreset;
+
+  /// 프리미엄 전용이라 잠긴 필터 id. 잠긴 필터를 탭하면 [onLockedSelect].
+  final Set<String> lockedFilterIds;
+  final ValueChanged<String> onLockedSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -125,9 +131,11 @@ class FilterPanel extends StatelessWidget {
                     final name =
                         index == 0 ? '원본' : kFilterPresets[index - 1].name;
                     final selected = id == selectedId;
-                    final scheme = Theme.of(context).colorScheme;
+                    final locked =
+                        id != null && lockedFilterIds.contains(id);
                     return GestureDetector(
-                      onTap: () => onSelect(id),
+                      onTap: () =>
+                          locked ? onLockedSelect(id) : onSelect(id),
                       child: Column(
                         children: [
                           Container(
@@ -143,13 +151,28 @@ class FilterPanel extends StatelessWidget {
                               ),
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: index < thumbs.length
-                                ? Image.memory(
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                if (index < thumbs.length)
+                                  Image.memory(
                                     thumbs[index],
                                     fit: BoxFit.cover,
                                     gaplessPlayback: true,
                                   )
-                                : const ColoredBox(color: Colors.black26),
+                                else
+                                  const ColoredBox(color: Colors.black26),
+                                if (locked)
+                                  const Align(
+                                    alignment: Alignment.topRight,
+                                    child: Padding(
+                                      padding: EdgeInsets.all(3),
+                                      child: Icon(Icons.lock,
+                                          size: 14, color: Colors.white),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(

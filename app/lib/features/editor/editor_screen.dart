@@ -13,10 +13,12 @@ import '../../core/face/face_landmarks.dart';
 import '../../core/face/retouch_settings.dart';
 import '../../core/filter_presets.dart';
 import '../../core/image_pipeline.dart';
+import '../../core/monetization/entitlement_service.dart';
 import '../../core/platform/image_export.dart';
 import '../../core/presets/preset_store.dart';
 import '../../core/presets/user_preset.dart';
 import '../../core/upscale/upscaler.dart';
+import '../paywall/paywall_screen.dart';
 import 'adjust_panel.dart';
 import 'crop_screen.dart';
 import 'erase_screen.dart';
@@ -103,10 +105,23 @@ class _EditorScreenState extends State<EditorScreen> {
     PresetStore.instance.load().then((presets) {
       if (mounted) setState(() => _userPresets = presets);
     });
+    EntitlementService.instance.init();
+    EntitlementService.instance.addListener(_onEntitlementChanged);
+  }
+
+  void _onEntitlementChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _showPaywall() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const PaywallScreen()),
+    );
   }
 
   @override
   void dispose() {
+    EntitlementService.instance.removeListener(_onEntitlementChanged);
     _previewImage?.dispose();
     unawaited(FaceDetectionService.instance.dispose());
     super.dispose();
@@ -318,6 +333,18 @@ class _EditorScreenState extends State<EditorScreen> {
     if (base == null || _busy) return;
     final snapshot = _history.current;
 
+    // 무료: 일 3회. 소모는 실제로 붓질을 추가했을 때만 한다.
+    final entitlement = EntitlementService.instance;
+    if (!entitlement.isPremium &&
+        await entitlement.remainingToday(PaidFeature.eraser) <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('오늘의 무료 지우개 횟수를 모두 썼습니다.')),
+      );
+      await _showPaywall();
+      return;
+    }
+
     setState(() => _busy = true);
     Uint8List clean;
     try {
@@ -340,6 +367,17 @@ class _EditorScreenState extends State<EditorScreen> {
     );
     if (strokes != null && !listEquals(strokes, snapshot.erasures)) {
       _commit(snapshot.copyWith(erasures: strokes));
+      // 붓질이 늘었을 때만 1회 소모 (되돌리기만 한 세션은 무료).
+      if (strokes.length > snapshot.erasures.length &&
+          !entitlement.isPremium) {
+        await entitlement.consume(PaidFeature.eraser);
+        final left = await entitlement.remainingToday(PaidFeature.eraser);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('오늘 무료 지우개 $left회 남음')),
+          );
+        }
+      }
     }
   }
 
@@ -415,6 +453,11 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _applyPreset(UserPreset preset) {
+    // 프리셋이 프리미엄 필터를 담고 있으면 같은 게이트를 적용한다.
+    if (EntitlementService.instance.isFilterLocked(preset.filterId)) {
+      _showPaywall();
+      return;
+    }
     _commit(_history.current.copyWith(
       adjustments: preset.adjustments,
       filterId: preset.filterId,
@@ -459,6 +502,7 @@ class _EditorScreenState extends State<EditorScreen> {
         filterId: snapshot.filterId,
         filterStrength: snapshot.filterStrength,
         upscale: snapshot.upscale,
+        watermark: EntitlementService.instance.needsWatermark,
         jpegQuality: 95,
       ),
     );
@@ -466,8 +510,28 @@ class _EditorScreenState extends State<EditorScreen> {
 
   String get _exportName => 'PHOTO_${DateTime.now().millisecondsSinceEpoch}';
 
+  /// 내보내기(저장/공유) 직전의 과금 게이트.
+  /// 화질 개선이 켜져 있으면 무료 일일 한도를 확인하고 1회 소모한다.
+  Future<bool> _checkExportAllowed() async {
+    final snapshot = _history.current;
+    final entitlement = EntitlementService.instance;
+    if (snapshot.upscale.isNoop || entitlement.isPremium) return true;
+
+    if (await entitlement.remainingToday(PaidFeature.upscale) <= 0) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('오늘의 무료 화질 개선 횟수를 모두 썼습니다.')),
+      );
+      await _showPaywall();
+      return false;
+    }
+    await entitlement.consume(PaidFeature.upscale);
+    return true;
+  }
+
   Future<void> _save() async {
     if (_saving) return;
+    if (!await _checkExportAllowed()) return;
     setState(() => _saving = true);
     try {
       final message = await saveImage(await _renderFullResolution(),
@@ -493,6 +557,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _share() async {
     if (_saving) return;
+    if (!await _checkExportAllowed()) return;
     setState(() => _saving = true);
     try {
       await shareImage(await _renderFullResolution(), _exportName);
@@ -599,6 +664,10 @@ class _EditorScreenState extends State<EditorScreen> {
           onSavePreset: _savePreset,
           onApplyPreset: _applyPreset,
           onDeletePreset: _deletePreset,
+          lockedFilterIds: EntitlementService.instance.isPremium
+              ? const {}
+              : EntitlementService.premiumFilterIds,
+          onLockedSelect: (_) => _showPaywall(),
         );
       case _EditorMode.adjust:
         return AdjustPanel(

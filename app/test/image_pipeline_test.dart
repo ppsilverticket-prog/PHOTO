@@ -202,6 +202,37 @@ void main() {
       expect(out.height, 2);
     });
 
+    test('watermark flag stamps the save path output', () {
+      // 64x64 단색으로 크게 만들어 우하단 변화 여부만 본다.
+      final source = img.Image(width: 64, height: 64);
+      for (final p in source) {
+        p.setRgb(20, 20, 20);
+      }
+      final bytes = Uint8List.fromList(img.encodePng(source));
+
+      final plain = decode(runPipeline(
+        PipelineRequest(sourceBytes: bytes, ops: const [], jpegQuality: 100),
+      ));
+      final marked = decode(runPipeline(
+        PipelineRequest(
+          sourceBytes: bytes,
+          ops: const [],
+          watermark: true,
+          jpegQuality: 100,
+        ),
+      ));
+
+      var diff = 0;
+      for (var y = 40; y < 64; y++) {
+        for (var x = 30; x < 64; x++) {
+          if ((marked.getPixel(x, y).r - plain.getPixel(x, y).r).abs() > 8) {
+            diff++;
+          }
+        }
+      }
+      expect(diff, greaterThan(10));
+    });
+
     test('generateFilterThumbnails returns original + all presets', () {
       final thumbs = generateFilterThumbnails(
         ThumbnailRequest(sourceBytes: makeTestImage(), size: 4),

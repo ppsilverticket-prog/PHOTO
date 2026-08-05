@@ -14,6 +14,7 @@ import 'face/retouch_settings.dart';
 import 'face/skin_smooth.dart';
 import 'filter_presets.dart';
 import 'upscale/upscaler.dart';
+import 'watermark.dart';
 
 /// [runPipeline]에 넘기는 요청. compute() 격리(isolate)로 전달되므로
 /// 순수 데이터만 담는다.
@@ -28,6 +29,7 @@ class PipelineRequest {
     this.filterId,
     this.filterStrength = 1.0,
     this.upscale = UpscaleSettings.off,
+    this.watermark = false,
     this.maxDimension,
     this.jpegQuality = 90,
   });
@@ -59,6 +61,9 @@ class PipelineRequest {
   /// 켜야 한다 — 프리뷰에 켜면 프리뷰 자체가 커져 버린다.
   final UpscaleSettings upscale;
 
+  /// 무료 사용자 저장본에 워터마크를 얹을지. 저장 경로에서만 켠다.
+  final bool watermark;
+
   /// 지정하면 연산 적용 전에 긴 변 기준으로 다운스케일한다.
   /// 정규화 좌표 연산은 스케일과 무관하므로 결과는 동일한 구도를 유지한다.
   final int? maxDimension;
@@ -82,6 +87,9 @@ Uint8List runPipeline(PipelineRequest request) {
   );
   if (!request.upscale.isNoop) {
     image = upscaleImage(image, request.upscale);
+  }
+  if (request.watermark) {
+    image = applyWatermark(image);
   }
   return Uint8List.fromList(
     img.encodeJpg(image, quality: request.jpegQuality),
