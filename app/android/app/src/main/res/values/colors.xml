@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#FFF7F2</color>
+    <!-- 스플래시 배경 — 라이트: 크림 (다크는 values-night에서 덮어쓴다) -->
+    <color name="splash_background">#FFF7F2</color>
+</resources>
