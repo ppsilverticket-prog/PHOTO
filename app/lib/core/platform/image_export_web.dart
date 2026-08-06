@@ -20,7 +20,7 @@ Future<String> saveImage(Uint8List bytes, String name) async {
   anchor.click();
   anchor.remove();
   web.URL.revokeObjectURL(url);
-  return '이미지를 내려받았습니다. 사진 앱에 넣으려면 공유 버튼을 쓰세요.';
+  return '이미지를 내려받았어요. 사진 앱에 넣으려면 공유 버튼을 쓰세요.';
 }
 
 /// Web Share API로 시스템 공유 시트를 연다. iOS 사파리에서는 여기서

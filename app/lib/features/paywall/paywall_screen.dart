@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/monetization/entitlement_service.dart';
+import '../../shared/app_theme.dart';
 
 enum _Plan {
   monthly('월간', '₩4,900', '/월', 'photo_premium_monthly'),
@@ -37,12 +38,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
       if (!mounted) return;
       if (ok) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('프리미엄이 활성화되었습니다 (테스트 모드).')),
+          const SnackBar(content: Text('프리미엄이 켜졌어요 (테스트 모드)!')),
         );
         Navigator.of(context).pop(true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('구매에 실패했습니다.')),
+          const SnackBar(content: Text('구매하지 못했어요.')),
         );
       }
     } finally {
@@ -52,6 +53,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 사진이 없는 화면이므로 크림 라이트 테마 (테마 시안 B 피치 소르베).
+    return Theme(
+      data: buildLightTheme(),
+      child: Builder(builder: _buildBody),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
@@ -77,7 +86,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '모든 기능이 열려 있습니다.',
+                    '모든 기능이 열려 있어요.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: scheme.onSurfaceVariant),
                   ),

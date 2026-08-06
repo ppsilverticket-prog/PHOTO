@@ -4,6 +4,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../shared/app_theme.dart';
+
 import '../../core/erase/erase_stroke.dart';
 import '../../core/image_pipeline.dart';
 
@@ -86,7 +88,7 @@ class _EraseScreenState extends State<EraseScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('지우기에 실패했습니다: $e')),
+        SnackBar(content: Text('지우지 못했어요: $e')),
       );
     } finally {
       if (mounted && generation == _generation) {
@@ -155,9 +157,9 @@ class _EraseScreenState extends State<EraseScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.canvas,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: AppColors.canvas,
         title: const Text('지우개'),
         actions: [
           IconButton(
@@ -229,7 +231,7 @@ class _EraseScreenState extends State<EraseScreen> {
                   Text(
                     _strokes.isEmpty
                         ? '지우고 싶은 부분을 문질러 주세요'
-                        : '${_strokes.length}번 지웠습니다',
+                        : '${_strokes.length}번 지웠어요',
                     style: TextStyle(
                       fontSize: 12,
                       color: scheme.onSurfaceVariant,

@@ -4,7 +4,9 @@ publish_to: 'none'
 version: 0.1.0+1
 
 environment:
-  sdk: ^3.12.2
+  # 하한 3.11: CI는 Flutter 3.44(Dart 3.12)로 빌드하지만, 로컬 개발은
+  # brew의 Flutter 3.41(Dart 3.11)에서도 가능해야 한다.
+  sdk: ^3.11.0
 
 dependencies:
   flutter:
@@ -27,3 +29,13 @@ flutter:
   uses-material-design: true
   shaders:
     - shaders/adjustments.frag
+  fonts:
+    # Pretendard (SIL OFL) — https://github.com/orioncactus/pretendard
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Regular.otf
+          weight: 400
+        - asset: assets/fonts/Pretendard-SemiBold.otf
+          weight: 600
+        - asset: assets/fonts/Pretendard-ExtraBold.otf
+          weight: 800

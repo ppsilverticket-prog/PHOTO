@@ -18,6 +18,7 @@ import '../../core/platform/image_export.dart';
 import '../../core/presets/preset_store.dart';
 import '../../core/presets/user_preset.dart';
 import '../../core/upscale/upscaler.dart';
+import '../../shared/app_theme.dart';
 import '../paywall/paywall_screen.dart';
 import 'adjust_panel.dart';
 import 'crop_screen.dart';
@@ -143,7 +144,7 @@ class _EditorScreenState extends State<EditorScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('이미지를 열 수 없습니다: $e')),
+        SnackBar(content: Text('이미지를 열 수 없어요: $e')),
       );
       Navigator.of(context).pop();
     }
@@ -339,7 +340,7 @@ class _EditorScreenState extends State<EditorScreen> {
         await entitlement.remainingToday(PaidFeature.eraser) <= 0) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('오늘의 무료 지우개 횟수를 모두 썼습니다.')),
+        const SnackBar(content: Text('오늘의 무료 지우개 횟수를 다 썼어요.')),
       );
       await _showPaywall();
       return;
@@ -400,7 +401,7 @@ class _EditorScreenState extends State<EditorScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content:
-                Text('화질 개선 ${settings.factor}배 — 저장할 때 적용됩니다.'),
+                Text('화질 개선 ${settings.factor}배 — 저장할 때 적용돼요.'),
           ),
         );
       }
@@ -448,7 +449,7 @@ class _EditorScreenState extends State<EditorScreen> {
     if (!mounted) return;
     setState(() => _userPresets = presets);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('"$name" 프리셋을 저장했습니다.')),
+      SnackBar(content: Text('"$name" 프리셋을 저장했어요.')),
     );
   }
 
@@ -520,7 +521,7 @@ class _EditorScreenState extends State<EditorScreen> {
     if (await entitlement.remainingToday(PaidFeature.upscale) <= 0) {
       if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('오늘의 무료 화질 개선 횟수를 모두 썼습니다.')),
+        const SnackBar(content: Text('오늘의 무료 화질 개선 횟수를 다 썼어요.')),
       );
       await _showPaywall();
       return false;
@@ -548,7 +549,7 @@ class _EditorScreenState extends State<EditorScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('저장에 실패했습니다: $e')),
+        SnackBar(content: Text('저장하지 못했어요: $e')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -564,7 +565,7 @@ class _EditorScreenState extends State<EditorScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('공유에 실패했습니다: $e')),
+        SnackBar(content: Text('공유하지 못했어요: $e')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -577,7 +578,7 @@ class _EditorScreenState extends State<EditorScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('편집 내용을 버릴까요?'),
-        content: const Text('저장하지 않은 편집 내용이 사라집니다.'),
+        content: const Text('저장하지 않은 편집 내용이 사라져요.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -764,7 +765,7 @@ class _EditorScreenState extends State<EditorScreen> {
               ),
             ),
             Container(
-              color: const Color(0xFF17171C),
+              color: AppColors.panel,
               child: SafeArea(
                 top: false,
                 child: Column(

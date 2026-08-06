@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../shared/app_theme.dart';
+
 import '../../core/monetization/entitlement_service.dart';
 import '../../core/upscale/upscaler.dart';
 import '../paywall/paywall_screen.dart';
@@ -55,7 +57,7 @@ class _UpscaleScreenState extends State<UpscaleScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('미리보기를 만들 수 없습니다: $e')),
+        SnackBar(content: Text('미리보기를 만들 수 없어요: $e')),
       );
     } finally {
       if (mounted && generation == _generation) {
@@ -78,9 +80,9 @@ class _UpscaleScreenState extends State<UpscaleScreen> {
         patch != null && patch.appliedScale < _settings.factor - 1e-9;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.canvas,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: AppColors.canvas,
         title: const Text('화질 개선'),
         actions: [
           TextButton(
@@ -162,7 +164,7 @@ class _UpscaleScreenState extends State<UpscaleScreen> {
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
                         '사진이 이미 커서 저장 시 약 '
-                        '${patch.appliedScale.toStringAsFixed(1)}배로 적용됩니다',
+                        '${patch.appliedScale.toStringAsFixed(1)}배로 적용돼요',
                         style: TextStyle(
                           fontSize: 12,
                           color: scheme.onSurfaceVariant,

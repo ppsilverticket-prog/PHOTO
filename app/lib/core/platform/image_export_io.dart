@@ -13,12 +13,12 @@ export 'image_export_exception.dart';
 Future<String> saveImage(Uint8List bytes, String name) async {
   try {
     await Gal.putImageBytes(bytes, name: name);
-    return '갤러리에 저장했습니다.';
+    return '갤러리에 저장했어요.';
   } on GalException catch (e) {
     throw ImageExportException(
       e.type == GalExceptionType.accessDenied
           ? '사진 접근 권한을 허용해 주세요.'
-          : '저장에 실패했습니다: ${e.type.message}',
+          : '저장하지 못했어요: ${e.type.message}',
     );
   }
 }

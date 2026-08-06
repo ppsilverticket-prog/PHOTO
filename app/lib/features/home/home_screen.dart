@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../shared/app_theme.dart';
 import '../editor/editor_screen.dart';
 
 /// 시작 화면: 갤러리/카메라에서 사진을 선택해 편집기로 이동한다.
+///
+/// 사진이 없는 화면이므로 크림 라이트 테마를 쓴다 (테마 시안 B 피치 소르베).
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -31,7 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('사진을 불러오지 못했습니다: $e')),
+        SnackBar(content: Text('사진을 불러오지 못했어요: $e')),
       );
     } finally {
       if (mounted) setState(() => _picking = false);
@@ -40,54 +43,76 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(flex: 2),
-              Icon(Icons.auto_awesome, size: 56, color: scheme.primary),
-              const SizedBox(height: 16),
-              const Text(
-                'PHOTO',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 6,
+    return Theme(
+      data: buildLightTheme(),
+      child: Builder(
+        builder: (context) {
+          final scheme = Theme.of(context).colorScheme;
+          return Scaffold(
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Spacer(flex: 2),
+                    Icon(Icons.auto_awesome, size: 52, color: scheme.primary),
+                    const SizedBox(height: 18),
+                    Text(
+                      'PHOTO',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 10,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '오늘의 사진, 다정하게 보정',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const Spacer(flex: 3),
+                    FilledButton.icon(
+                      onPressed:
+                          _picking ? null : () => _pick(ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: const Text('갤러리에서 선택'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed:
+                          _picking ? null : () => _pick(ImageSource.camera),
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      label: const Text('카메라로 촬영'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                    const SizedBox(height: 26),
+                    Text(
+                      '사진은 기기 밖으로 나가지 않아요',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                '자연스러운 AI 사진 보정',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: scheme.onSurfaceVariant),
-              ),
-              const Spacer(flex: 3),
-              FilledButton.icon(
-                onPressed: _picking ? null : () => _pick(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library_outlined),
-                label: const Text('갤러리에서 선택'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _picking ? null : () => _pick(ImageSource.camera),
-                icon: const Icon(Icons.photo_camera_outlined),
-                label: const Text('카메라로 촬영'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-              const Spacer(),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

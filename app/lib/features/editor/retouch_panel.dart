@@ -175,7 +175,7 @@ class _RetouchPanelState extends State<RetouchPanel> {
     }
     if (!hasFace) {
       return Text(
-        '얼굴을 찾지 못했습니다 · 피부 보정만 사용할 수 있어요',
+        '얼굴을 찾지 못했어요 · 피부 보정만 사용할 수 있어요',
         style: TextStyle(
           fontSize: 12,
           color: Theme.of(context).colorScheme.onSurfaceVariant,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'features/home/home_screen.dart';
+import 'shared/app_theme.dart';
 
 void main() {
   runApp(const PhotoApp());
@@ -14,19 +15,9 @@ class PhotoApp extends StatelessWidget {
     return MaterialApp(
       title: 'PHOTO',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF7C6CFF),
-          brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: const Color(0xFF101014),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF101014),
-          elevation: 0,
-        ),
-        useMaterial3: true,
-      ),
+      // 기본은 편집기용 무채색 다크. 사진이 없는 화면(홈·페이월)은
+      // 각자 buildLightTheme()으로 감싼다.
+      theme: buildEditorTheme(),
       home: const HomeScreen(),
     );
   }

@@ -4,6 +4,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../../shared/app_theme.dart';
+
 /// 자르기 화면. 확정하면 정규화(0~1) [Rect]를 pop으로 반환한다.
 class CropScreen extends StatefulWidget {
   const CropScreen({super.key, required this.imageBytes});
@@ -280,9 +282,9 @@ class _CropScreenState extends State<CropScreen> {
   Widget build(BuildContext context) {
     final image = _image;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.canvas,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: AppColors.canvas,
         title: const Text('자르기'),
         actions: [
           TextButton(
