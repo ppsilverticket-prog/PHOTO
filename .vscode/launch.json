@@ -1,0 +1,31 @@
+{
+  // VS Code 실행 구성 (Run and Debug 패널 또는 F5).
+  // Flutter 프로젝트가 저장소 루트가 아니라 app/ 안에 있으므로
+  // cwd를 지정해 둔다 — 저장소 루트를 열어도 바로 실행된다.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "앱 디버그 (핫 리로드)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "app",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "앱 릴리즈 (실제 성능)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "app",
+      "program": "lib/main.dart",
+      "flutterMode": "release"
+    },
+    {
+      "name": "웹 (Chrome)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "app",
+      "program": "lib/main.dart",
+      "deviceId": "chrome"
+    }
+  ]
+}

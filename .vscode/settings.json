@@ -1,0 +1,17 @@
+{
+  // 저장할 때 Dart 포맷터 적용 — 커밋 스타일을 일정하게 유지한다.
+  "[dart]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "Dart-Code.dart-code"
+  },
+  // 빌드 산출물은 검색/탐색기에서 숨긴다.
+  "files.exclude": {
+    "**/.dart_tool": true,
+    "**/build": true
+  },
+  "search.exclude": {
+    "**/.dart_tool": true,
+    "**/build": true,
+    "**/*.g.dart": true
+  }
+}
