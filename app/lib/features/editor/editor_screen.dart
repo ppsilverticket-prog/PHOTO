@@ -509,7 +509,7 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  String get _exportName => 'PHOTO_${DateTime.now().millisecondsSinceEpoch}';
+  String get _exportName => 'CHALKAK_${DateTime.now().millisecondsSinceEpoch}';
 
   /// 내보내기(저장/공유) 직전의 과금 게이트.
   /// 화질 개선이 켜져 있으면 무료 일일 한도를 확인하고 1회 소모한다.

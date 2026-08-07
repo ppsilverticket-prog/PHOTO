@@ -65,7 +65,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: const CloseButton(),
-        title: const Text('PHOTO 프리미엄'),
+        title: const Text('찰칵 프리미엄'),
       ),
       body: ListenableBuilder(
         listenable: EntitlementService.instance,

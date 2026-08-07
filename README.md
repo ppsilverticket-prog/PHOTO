@@ -1,6 +1,8 @@
-# PHOTO — AI 사진 보정 앱
+# 찰칵 (CHALKAK) — AI 사진 보정 앱
 
 EPIK · SNOW · SODA · Lightroom을 벤치마크한 Android/iOS AI 사진 보정 앱.
+셔터 소리 "찰칵"에서 따온 이름으로, 앱 표시명은 **찰칵**, 로마자 표기는
+**CHALKAK**(워터마크·파일명), 저장소 이름은 PHOTO를 유지한다.
 
 - 📋 **기획서**: [docs/PLANNING.md](docs/PLANNING.md)
 - 📱 **아이폰에서 웹으로 바로 테스트** (맥 불필요): [docs/WEB_PREVIEW.md](docs/WEB_PREVIEW.md)

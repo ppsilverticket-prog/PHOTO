@@ -58,19 +58,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Spacer(flex: 2),
                     Icon(Icons.auto_awesome, size: 52, color: scheme.primary),
                     const SizedBox(height: 18),
-                    Text(
-                      'PHOTO',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 10,
-                        color: scheme.onSurface,
+                    Padding(
+                      // letterSpacing이 마지막 글자 뒤에도 붙어 중심이
+                      // 왼쪽으로 치우치므로 그만큼 왼쪽 여백으로 보정한다.
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Text(
+                        '찰칵',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 8,
+                          color: scheme.onSurface,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '오늘의 사진, 다정하게 보정',
+                      '찰칵, 하나로 끝나는 보정',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,

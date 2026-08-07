@@ -13,7 +13,7 @@ class PhotoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'PHOTO',
+      title: '찰칵',
       debugShowCheckedModeBanner: false,
       // 기본은 편집기용 무채색 다크. 사진이 없는 화면(홈·페이월)은
       // 각자 buildLightTheme()으로 감싼다.

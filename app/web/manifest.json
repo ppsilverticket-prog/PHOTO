@@ -1,11 +1,11 @@
 {
-    "name": "photo_app",
-    "short_name": "photo_app",
+    "name": "찰칵 — AI 사진 보정",
+    "short_name": "찰칵",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFF7F2",
     "theme_color": "#FF8E78",
-    "description": "A new Flutter project.",
+    "description": "찍고, 다듬고, 저장까지. 찰칵 하나로 끝나는 사진 보정.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
